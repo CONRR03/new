@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Twitch Low Latency Sync",
+  "description": "Keeps Twitch streams synced to the live edge for minimal delay",
+  "version": "1.0.0",
+  "permissions": [],
+  "host_permissions": [
+    "https://www.twitch.tv/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://www.twitch.tv/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}
