@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      width: 300px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #18181b;
+      color: #efeff1;
+      padding: 16px;
+    }
+
+    h1 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #9147ff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    h1::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      background: #00f593;
+      border-radius: 50%;
+    }
+
+    .setting {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      color: #adadb8;
+      margin-bottom: 6px;
+    }
+
+    select, input[type="range"] {
+      width: 100%;
+      padding: 8px 12px;
+      background: #0e0e10;
+      border: 1px solid #3d3d40;
+      border-radius: 6px;
+      color: #efeff1;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    select:hover, input[type="range"]:hover {
+      border-color: #9147ff;
+    }
+
+    select:focus {
+      outline: none;
+      border-color: #9147ff;
+    }
+
+    .range-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .range-container input {
+      flex: 1;
+    }
+
+    .range-value {
+      min-width: 45px;
+      text-align: right;
+      font-size: 14px;
+      color: #9147ff;
+      font-weight: 500;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      height: 6px;
+      padding: 0;
+      background: #3d3d40;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #9147ff;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      background: #a970ff;
+    }
+
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .toggle {
+      position: relative;
+      width: 44px;
+      height: 24px;
+    }
+
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #3d3d40;
+      border-radius: 24px;
+      transition: 0.2s;
+    }
+
+    .toggle-slider::before {
+      position: absolute;
+      content: '';
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background: #efeff1;
+      border-radius: 50%;
+      transition: 0.2s;
+    }
+
+    .toggle input:checked + .toggle-slider {
+      background: #9147ff;
+    }
+
+    .toggle input:checked + .toggle-slider::before {
+      transform: translateX(20px);
+    }
+
+    .saved {
+      text-align: center;
+      padding: 8px;
+      background: #00f593;
+      color: #0e0e10;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      margin-top: 12px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .saved.show {
+      opacity: 1;
+    }
+
+    .divider {
+      height: 1px;
+      background: #3d3d40;
+      margin: 16px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Low Latency Sync</h1>
+
+  <div class="setting">
+    <div class="toggle-container">
+      <label style="margin: 0;">Enable Extension</label>
+      <div class="toggle">
+        <input type="checkbox" id="enabled" checked>
+        <span class="toggle-slider"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="setting">
+    <label>Max Acceptable Delay</label>
+    <select id="maxDelay">
+      <option value="1">1 second (Aggressive)</option>
+      <option value="2">2 seconds</option>
+      <option value="3" selected>3 seconds (Recommended)</option>
+      <option value="5">5 seconds</option>
+      <option value="10">10 seconds (Relaxed)</option>
+    </select>
+  </div>
+
+  <div class="setting">
+    <label>Catch-up Speed</label>
+    <select id="catchUpSpeed">
+      <option value="1.02">1.02x (Subtle)</option>
+      <option value="1.05" selected>1.05x (Recommended)</option>
+      <option value="1.1">1.10x (Fast)</option>
+      <option value="1.25">1.25x (Aggressive)</option>
+    </select>
+  </div>
+
+  <div class="setting">
+    <label>Hard Sync Threshold</label>
+    <select id="softSyncThreshold">
+      <option value="5">5 seconds</option>
+      <option value="8" selected>8 seconds (Recommended)</option>
+      <option value="15">15 seconds</option>
+      <option value="30">30 seconds</option>
+    </select>
+  </div>
+
+  <div class="setting">
+    <label>Check Interval</label>
+    <div class="range-container">
+      <input type="range" id="checkInterval" min="1" max="15" value="5">
+      <span class="range-value" id="checkIntervalValue">5s</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="setting">
+    <div class="toggle-container">
+      <label style="margin: 0;">Debug Mode (Console Logs)</label>
+      <div class="toggle">
+        <input type="checkbox" id="debug">
+        <span class="toggle-slider"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="saved" id="saved">Settings saved!</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -4,21 +4,17 @@
 (function() {
   'use strict';
 
-  const CONFIG = {
-    // How often to check if we need to sync (ms)
+  // Default config - will be overridden by saved settings
+  let CONFIG = {
+    enabled: true,
     checkInterval: 5000,
-    // Maximum acceptable delay from live edge (seconds)
     maxDelay: 3,
-    // Speed boost when catching up (1.0 = normal, 1.1 = 10% faster)
     catchUpSpeed: 1.05,
-    // Threshold to trigger speed catchup vs hard sync (seconds)
     softSyncThreshold: 8,
-    // Debug mode
     debug: false
   };
 
-  let isActive = true;
-  let player = null;
+  let syncInterval = null;
 
   function log(...args) {
     if (CONFIG.debug) {
@@ -26,33 +22,55 @@
     }
   }
 
+  // Load settings from storage
+  function loadSettings() {
+    return new Promise((resolve) => {
+      if (chrome.storage && chrome.storage.sync) {
+        chrome.storage.sync.get({
+          enabled: true,
+          maxDelay: '3',
+          catchUpSpeed: '1.05',
+          softSyncThreshold: '8',
+          checkInterval: 5,
+          debug: false
+        }, (settings) => {
+          CONFIG.enabled = settings.enabled;
+          CONFIG.maxDelay = parseFloat(settings.maxDelay);
+          CONFIG.catchUpSpeed = parseFloat(settings.catchUpSpeed);
+          CONFIG.softSyncThreshold = parseFloat(settings.softSyncThreshold);
+          CONFIG.checkInterval = settings.checkInterval * 1000;
+          CONFIG.debug = settings.debug;
+          log('Settings loaded:', CONFIG);
+          resolve();
+        });
+      } else {
+        resolve();
+      }
+    });
+  }
+
+  // Listen for settings updates from popup
+  if (chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (message.type === 'SETTINGS_UPDATED') {
+        log('Settings updated from popup');
+        CONFIG.enabled = message.settings.enabled;
+        CONFIG.maxDelay = parseFloat(message.settings.maxDelay);
+        CONFIG.catchUpSpeed = parseFloat(message.settings.catchUpSpeed);
+        CONFIG.softSyncThreshold = parseFloat(message.settings.softSyncThreshold);
+        CONFIG.checkInterval = message.settings.checkInterval * 1000;
+        CONFIG.debug = message.settings.debug;
+
+        // Restart the interval with new timing
+        restartSyncInterval();
+        log('New settings applied:', CONFIG);
+      }
+    });
+  }
+
   // Get the video element
   function getVideoElement() {
     return document.querySelector('video');
-  }
-
-  // Try to get Twitch's internal player API
-  function getTwitchPlayer() {
-    try {
-      // Twitch stores player instance on the window
-      const playerRoot = document.querySelector('.video-player');
-      if (playerRoot && playerRoot.__reactFiber$) {
-        // Navigate React fiber to find player
-        let fiber = playerRoot.__reactFiber$;
-        while (fiber) {
-          if (fiber.memoizedProps?.mediaPlayerInstance) {
-            return fiber.memoizedProps.mediaPlayerInstance;
-          }
-          if (fiber.memoizedState?.mediaPlayerInstance) {
-            return fiber.memoizedState.mediaPlayerInstance;
-          }
-          fiber = fiber.return;
-        }
-      }
-    } catch (e) {
-      log('Could not access Twitch player API:', e);
-    }
-    return null;
   }
 
   // Calculate delay from live edge
@@ -61,7 +79,6 @@
       return null;
     }
 
-    // The end of the buffer is roughly the live edge
     const bufferEnd = video.buffered.end(video.buffered.length - 1);
     const currentTime = video.currentTime;
     const delay = bufferEnd - currentTime;
@@ -95,39 +112,12 @@
     }
   }
 
-  // Click the "Skip to Live" button if available
-  function clickSkipToLive() {
-    const skipButton = document.querySelector(
-      'button[data-a-target="player-skip-to-live-button"],' +
-      'button[aria-label*="Skip to Live"],' +
-      '[data-a-target="player-seekbar-current-time"]'
-    );
-
-    if (skipButton) {
-      log('Found Skip to Live button, clicking');
-      skipButton.click();
-      return true;
-    }
-    return false;
-  }
-
-  // Enable low latency mode in settings if available
-  function enableLowLatencyMode() {
-    try {
-      // Try to find and enable low latency in player settings
-      const settingsButton = document.querySelector('[data-a-target="player-settings-button"]');
-      if (settingsButton) {
-        // This is a simplified approach - full implementation would navigate the settings menu
-        log('Settings button found - low latency can be enabled manually in Settings > Advanced > Low Latency');
-      }
-    } catch (e) {
-      log('Could not auto-enable low latency mode:', e);
-    }
-  }
-
   // Main sync check function
   function checkAndSync() {
-    if (!isActive) return;
+    if (!CONFIG.enabled) {
+      log('Extension disabled, skipping sync');
+      return;
+    }
 
     const video = getVideoElement();
     if (!video) {
@@ -151,21 +141,30 @@
     }
   }
 
+  // Restart the sync interval (called when settings change)
+  function restartSyncInterval() {
+    if (syncInterval) {
+      clearInterval(syncInterval);
+    }
+    syncInterval = setInterval(checkAndSync, CONFIG.checkInterval);
+    log('Sync interval restarted:', CONFIG.checkInterval, 'ms');
+  }
+
   // Initialize
-  function init() {
+  async function init() {
+    await loadSettings();
+
     log('Twitch Low Latency Sync initialized');
     log('Max acceptable delay:', CONFIG.maxDelay, 's');
+    log('Enabled:', CONFIG.enabled);
 
     // Start periodic sync checks
-    setInterval(checkAndSync, CONFIG.checkInterval);
+    restartSyncInterval();
 
     // Initial check after a short delay to let the player load
-    setTimeout(() => {
-      checkAndSync();
-      enableLowLatencyMode();
-    }, 3000);
+    setTimeout(checkAndSync, 3000);
 
-    // Also sync when visibility changes (user returns to tab)
+    // Sync when visibility changes (user returns to tab)
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         log('Tab became visible, checking sync');
@@ -174,7 +173,7 @@
     });
 
     // Listen for video element changes
-    const observer = new MutationObserver((mutations) => {
+    const observer = new MutationObserver(() => {
       const video = getVideoElement();
       if (video && !video.hasAttribute('data-low-latency-init')) {
         video.setAttribute('data-low-latency-init', 'true');
